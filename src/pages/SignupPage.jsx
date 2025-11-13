@@ -1,3 +1,4 @@
+// src/pages/SignupPage.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,31 +9,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Separator } from '../components/ui/separator';
 import { Progress } from '../components/ui/progress';
-import { Leaf, Mail, Lock, User, Phone, Chrome, Facebook as FacebookIcon, ShoppingBag, Store } from 'lucide-react';
+import { Leaf, Mail, Lock, User, Phone, ShoppingBag, Store } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SignupPage() {
   const navigate = useNavigate();
-  const { user, signup, loginWithGoogle, loginWithFacebook } = useAuth();
-  
+  const { user, signup } = useAuth();
+
   const [formData, setFormData] = useState({
-    name: '',
+    username: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
     password: '',
     confirmPassword: '',
-    role: 'CUSTOMER',
+    role: 'USER',
   });
+
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
-      const redirectMap = {
-        ADMIN: '/admin',
-        SELLER: '/seller',
-        CUSTOMER: '/customer',
-      };
-      navigate(redirectMap[user.role]);
+      const redirectMap = { ADMIN: '/admin', SELLER: '/seller', USER: '/customer' };
+      navigate(redirectMap[user.role] || '/');
     }
   }, [user, navigate]);
 
@@ -47,13 +47,6 @@ export default function SignupPage() {
   };
 
   const passwordStrength = getPasswordStrength(formData.password);
-  const getStrengthColor = () => {
-    if (passwordStrength < 25) return 'bg-red-500';
-    if (passwordStrength < 50) return 'bg-orange-500';
-    if (passwordStrength < 75) return 'bg-yellow-500';
-    return 'bg-green-500';
-  };
-
   const getStrengthLabel = () => {
     if (passwordStrength < 25) return 'Weak';
     if (passwordStrength < 50) return 'Fair';
@@ -77,31 +70,16 @@ export default function SignupPage() {
     setLoading(true);
     try {
       await signup({
-        name: formData.name,
+        username: formData.username,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
         email: formData.email,
+        phone: formData.phone || undefined,
         password: formData.password,
         role: formData.role,
-        phone: formData.phone || undefined,
       });
-      // Navigation is handled by AuthContext redirect in App.jsx
-    } catch (error) {
-      // Error is handled in AuthContext
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSocialSignup = async (provider) => {
-    setLoading(true);
-    try {
-      if (provider === 'google') {
-        await loginWithGoogle();
-      } else {
-        await loginWithFacebook();
-      }
-      // Navigation is handled by AuthContext redirect in App.jsx
-    } catch (error) {
-      // Error is handled in AuthContext
+    } catch (err) {
+      // handled in context
     } finally {
       setLoading(false);
     }
@@ -110,7 +88,6 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 py-12">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 text-emerald-600">
             <Leaf className="w-8 h-8" />
@@ -123,178 +100,92 @@ export default function SignupPage() {
             <CardTitle>Create Your Account</CardTitle>
             <CardDescription>Join the sustainable shopping revolution</CardDescription>
           </CardHeader>
-          <CardContent>
-            {/* Social Signup Buttons */}
-            <div className="space-y-3 mb-6">
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => handleSocialSignup('google')}
-                disabled={loading}
-              >
-                <Chrome className="w-5 h-5 mr-2" />
-                Sign up with Google
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => handleSocialSignup('facebook')}
-                disabled={loading}
-              >
-                <FacebookIcon className="w-5 h-5 mr-2" />
-                Sign up with Facebook
-              </Button>
-            </div>
 
-            <div className="relative mb-6">
-              <Separator />
-              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 text-sm text-gray-500">
-                or
-              </span>
+          <CardContent className="relative z-10">
+            <div className="relative mb-6 flex items-center justify-center">
+              <Separator className="w-full" />
+              <span className="absolute bg-white px-2 text-sm text-gray-500 z-20">Sign up</span>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Account Type */}
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <Input id="username" className="pl-10" placeholder="john_doe" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} required />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input id="firstName" placeholder="John" value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input id="lastName" placeholder="Doe" value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} required />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <Input id="email" type="email" placeholder="you@example.com" className="pl-10" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone (optional)</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <Input id="phone" type="tel" placeholder="+91 9876543210" className="pl-10" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+                </div>
+              </div>
+
               <div className="space-y-3">
                 <Label>I want to</Label>
-                <RadioGroup
-                  value={formData.role}
-                  onValueChange={(value) => setFormData({ ...formData, role: value })}
-                >
+                <RadioGroup value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
                   <div className="flex items-center space-x-2 border rounded-lg p-4 cursor-pointer hover:bg-emerald-50 transition-colors">
-                    <RadioGroupItem value="CUSTOMER" id="customer" />
-                    <Label htmlFor="customer" className="flex items-center gap-2 cursor-pointer flex-1">
+                    <RadioGroupItem value="USER" id="user" />
+                    <Label htmlFor="user" className="flex items-center gap-2 cursor-pointer flex-1">
                       <ShoppingBag className="w-5 h-5 text-emerald-600" />
-                      <div>
-                        <div>Shop as Customer</div>
-                        <div className="text-xs text-gray-500">Browse and purchase eco-friendly products</div>
-                      </div>
+                      <div>Shop as Customer</div>
                     </Label>
                   </div>
+
                   <div className="flex items-center space-x-2 border rounded-lg p-4 cursor-pointer hover:bg-emerald-50 transition-colors">
                     <RadioGroupItem value="SELLER" id="seller" />
                     <Label htmlFor="seller" className="flex items-center gap-2 cursor-pointer flex-1">
                       <Store className="w-5 h-5 text-emerald-600" />
-                      <div>
-                        <div>Sell as Seller/Farmer</div>
-                        <div className="text-xs text-gray-500">Requires admin approval</div>
-                      </div>
+                      <div>Sell as Seller</div>
                     </Label>
                   </div>
                 </RadioGroup>
               </div>
 
-              {/* Name */}
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="John Doe"
-                    className="pl-10"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your@email.com"
-                    className="pl-10"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Phone (Optional) */}
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number (Optional)</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+1 234 567 8900"
-                    className="pl-10"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    className="pl-10"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    required
-                  />
+                  <Input id="password" type="password" placeholder="••••••••" className="pl-10" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required />
                 </div>
-                {formData.password && (
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Progress value={passwordStrength} className="h-2" />
-                      <span className="text-xs text-gray-600">{getStrengthLabel()}</span>
-                    </div>
-                    <div className={`h-1 rounded ${getStrengthColor()}`} style={{ width: `${passwordStrength}%` }}></div>
-                  </div>
-                )}
+                {formData.password && <div className="space-y-1"><Progress value={passwordStrength} className="h-2" /><span className="text-xs text-gray-600">{getStrengthLabel()}</span></div>}
               </div>
 
-              {/* Confirm Password */}
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="••••••••"
-                    className="pl-10"
-                    value={formData.confirmPassword}
-                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    required
-                  />
+                  <Input id="confirmPassword" type="password" placeholder="••••••••" className="pl-10" value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} required />
                 </div>
               </div>
 
-              {formData.role === 'SELLER' && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-800">
-                    Your seller account will be pending admin approval. You'll be notified once verified.
-                  </p>
-                </div>
-              )}
-
-              <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={loading}>
-                {loading ? 'Creating Account...' : 'Create Account'}
-              </Button>
+              <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={loading}>{loading ? 'Creating Account...' : 'Create Account'}</Button>
             </form>
 
-            <div className="mt-6 text-center text-sm">
-              Already have an account?{' '}
-              <Link to="/login" className="text-emerald-600 hover:underline">
-                Login
-              </Link>
+            <div className="mt-6 text-center text-sm relative z-50">
+              Already have an account? <Link to="/login" className="text-emerald-600 hover:underline pointer-events-auto relative z-50">Login</Link>
             </div>
           </CardContent>
         </Card>

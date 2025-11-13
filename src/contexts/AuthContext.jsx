@@ -1,139 +1,125 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+// src/contexts/AuthContext.jsx
+import { createContext, useContext, useEffect, useState } from 'react';
 import { authService } from '../services/authService';
 import { toast } from 'sonner';
 
 const AuthContext = createContext(undefined);
 
-// Session timeout: 30 minutes in milliseconds
 const SESSION_TIMEOUT = 30 * 60 * 1000;
-const ACTIVITY_CHECK_INTERVAL = 60 * 1000; // Check every minute
+const ACTIVITY_CHECK_INTERVAL = 60 * 1000;
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [lastActivity, setLastActivity] = useState(Date.now());
 
-  // Track user activity
+  // Activity tracking to maintain lastActivity
   useEffect(() => {
-    const updateActivity = () => {
-      setLastActivity(Date.now());
-      localStorage.setItem('lastActivity', Date.now().toString());
-    };
-
-    // Update activity on user interactions
+    const updateActivity = () => localStorage.setItem('lastActivity', Date.now().toString());
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
-    events.forEach(event => {
-      window.addEventListener(event, updateActivity);
-    });
-
-    return () => {
-      events.forEach(event => {
-        window.removeEventListener(event, updateActivity);
-      });
-    };
+    events.forEach(ev => window.addEventListener(ev, updateActivity));
+    return () => events.forEach(ev => window.removeEventListener(ev, updateActivity));
   }, []);
 
-  // Check for session timeout
+  // Load stored session on mount
   useEffect(() => {
-    if (!user) return;
-
-    const checkTimeout = setInterval(() => {
-      const lastActivityTime = parseInt(localStorage.getItem('lastActivity') || Date.now().toString());
-      const currentTime = Date.now();
-      const timeSinceActivity = currentTime - lastActivityTime;
-
-      if (timeSinceActivity > SESSION_TIMEOUT) {
-        // Session expired
-        toast.error('Session expired. Please login again.');
-        logout();
-      }
-    }, ACTIVITY_CHECK_INTERVAL);
-
-    return () => clearInterval(checkTimeout);
-  }, [user]);
-
-  useEffect(() => {
-    // Check for existing session on mount
-    const storedUser = authService.getCurrentUser();
-    if (storedUser) {
-      // Check if session is still valid
-      const lastActivityTime = parseInt(localStorage.getItem('lastActivity') || Date.now().toString());
-      const timeSinceActivity = Date.now() - lastActivityTime;
-      
-      if (timeSinceActivity > SESSION_TIMEOUT) {
-        // Session expired
-        authService.logout();
-        toast.error('Session expired. Please login again.');
+    const stored = authService.getCurrentUser();
+    if (stored) {
+      const last = parseInt(localStorage.getItem('lastActivity') || Date.now().toString(), 10);
+      if (Date.now() - last > SESSION_TIMEOUT) {
+        authService.clearSession();
+        setUser(null);
       } else {
-        setUser(storedUser);
-        setLastActivity(lastActivityTime);
+        setUser(stored);
       }
     }
     setLoading(false);
   }, []);
 
-  const login = async (email, password) => {
+  // Session timeout watcher
+  useEffect(() => {
+    if (!user) return;
+    const id = setInterval(() => {
+      const last = parseInt(localStorage.getItem('lastActivity') || Date.now().toString(), 10);
+      if (Date.now() - last > SESSION_TIMEOUT) {
+        toast.error('Session expired. Please login again.');
+        logout();
+      }
+    }, ACTIVITY_CHECK_INTERVAL);
+    return () => clearInterval(id);
+  }, [user]);
+
+  // API wrappers
+  const login = async (identifier, password) => {
     try {
-      const userData = await authService.login(email, password);
-      setUser(userData);
+      const u = await authService.login(identifier, password);
+      setUser(u);
       toast.success('Login successful!');
-      return userData;
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Login failed');
-      throw error;
+      return u;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Login failed');
+      throw err;
     }
   };
 
   const loginWithGoogle = async () => {
     try {
-      const userData = await authService.loginWithGoogle();
-      setUser(userData);
+      const u = await authService.loginWithGoogle();
+      setUser(u);
       toast.success('Login with Google successful!');
-      return userData;
-    } catch (error) {
+      return u;
+    } catch (err) {
       toast.error('Google login failed');
-      throw error;
+      throw err;
     }
   };
 
   const loginWithFacebook = async () => {
     try {
-      const userData = await authService.loginWithFacebook();
-      setUser(userData);
+      const u = await authService.loginWithFacebook();
+      setUser(u);
       toast.success('Login with Facebook successful!');
-      return userData;
-    } catch (error) {
+      return u;
+    } catch (err) {
       toast.error('Facebook login failed');
-      throw error;
+      throw err;
     }
   };
 
   const loginWithOTP = async (phone, otp) => {
     try {
-      const userData = await authService.loginWithOTP(phone, otp);
-      setUser(userData);
+      const u = await authService.loginWithOTP(phone, otp);
+      setUser(u);
       toast.success('Login successful!');
-      return userData;
-    } catch (error) {
-      toast.error('OTP verification failed');
-      throw error;
+      return u;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'OTP verification failed');
+      throw err;
     }
   };
 
   const signup = async (data) => {
     try {
-      const userData = await authService.signup(data);
-      setUser(userData);
-      
+      const u = await authService.signup(data);
+      setUser(u);
       if (data.role === 'SELLER') {
         toast.success('Account created! Your seller account is pending admin approval.');
       } else {
         toast.success('Account created successfully!');
       }
-      return userData;
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Signup failed');
-      throw error;
+      return u;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Signup failed');
+      throw err;
+    }
+  };
+
+  const sendOTP = async (phone) => {
+    try {
+      await authService.sendOTP(phone);
+      toast.success('OTP sent (if backend configured) — mock OTP: 123456');
+    } catch (err) {
+      toast.error('Failed to send OTP');
+      throw err;
     }
   };
 
@@ -144,28 +130,25 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        login,
-        loginWithGoogle,
-        loginWithFacebook,
-        loginWithOTP,
-        signup,
-        logout,
-        isAuthenticated: !!user,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      login,
+      loginWithGoogle,
+      loginWithFacebook,
+      loginWithOTP,
+      signup,
+      sendOTP,
+      logout,
+      isAuthenticated: !!user,
+    }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 }

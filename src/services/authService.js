@@ -1,49 +1,53 @@
-// Mock Auth Service - Ready for Spring Boot Backend Integration
-// API Endpoint: http://localhost:8080/api/auth
-//
-// DEMO CREDENTIALS:
-// -----------------
-// Admin Login:
-//   Email: admin@ecobazaarx.com
-//   Password: EcoAdmin@2024
-//
-// For testing Seller/Customer accounts:
-//   - Sign up as Customer: Instant access to customer dashboard
-//   - Sign up as Seller: Account will be in PENDING status until admin approves
-//   - Social login (Google/Facebook): Creates customer account automatically
-//   - OTP Login: Use any phone number and OTP: 123456
-//
-// Admin cannot sign up - only login with predefined credentials above
+// src/services/authService.js
+// Hybrid AuthService: tries backend; falls back to mock when backend fails or MOCK_MODE = true.
 
-// Mock users database (replace with actual API calls)
-const MOCK_USERS = [
-  {
-    id: 'admin-001',
-    email: 'admin@ecobazaarx.com',
-    name: 'System Administrator',
-    role: 'ADMIN',
-    carbonPoints: 0,
-    createdAt: '2024-01-01T00:00:00Z',
-  },
-];
-
-// Dummy Admin Credentials
 export const ADMIN_CREDENTIALS = {
   email: 'admin@ecobazaarx.com',
   password: 'EcoAdmin@2024',
 };
 
+const USER_KEY = 'ecobazaarx_user';
+const TOKEN_KEY = 'ecobazaarx_token';
+
+const nowISO = () => new Date().toISOString();
+
+const INITIAL_MOCK_USERS = [
+  {
+    id: 'admin-001',
+    username: 'admin_master',
+    email: ADMIN_CREDENTIALS.email,
+    firstName: 'System',
+    lastName: 'Administrator',
+    role: 'ADMIN',
+    sellerStatus: undefined,
+    phone: undefined,
+    createdAt: '2024-01-01T00:00:00Z',
+  },
+];
+
 class AuthService {
   constructor() {
-    this.API_BASE = 'http://localhost:8080/api/auth'; // Spring Boot backend
-    this.TOKEN_KEY = 'ecobazaarx_token';
-    this.USER_KEY = 'ecobazaarx_user';
-    this.MOCK_MODE = true; // Mock mode flag - set to false when backend is ready
+    // Change base if your backend is on a different port (used when MOCK_MODE=false)
+    this.API_BASE = 'http://localhost:8080';
+    this.USER_KEY = USER_KEY;
+    this.TOKEN_KEY = TOKEN_KEY;
+
+    // Default mode: try backend first; if backend fails, auto-fallback to mock.
+    // You can force mock-only mode by setting this.FORCE_MOCK = true;
+    this.FORCE_MOCK = false;
+
+    // mock store (in-memory + seeding)
+    this._mockUsers = [...INITIAL_MOCK_USERS];
   }
 
+  // storage helpers
   getCurrentUser() {
-    const userStr = localStorage.getItem(this.USER_KEY);
-    return userStr ? JSON.parse(userStr) : null;
+    try {
+      const raw = localStorage.getItem(this.USER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
   }
 
   getToken() {
@@ -52,215 +56,216 @@ class AuthService {
 
   saveSession(user, token) {
     localStorage.setItem(this.USER_KEY, JSON.stringify(user));
-    localStorage.setItem(this.TOKEN_KEY, token);
+    if (token) localStorage.setItem(this.TOKEN_KEY, token);
     localStorage.setItem('lastActivity', Date.now().toString());
   }
 
-  async login(email, password) {
-    if (this.MOCK_MODE) {
-      // Mock implementation
-      return new Promise((resolve, reject) => {
-        setTimeout(() => {
-          // Check admin credentials
-          if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
-            const adminUser = MOCK_USERS[0];
-            this.saveSession(adminUser, 'mock-admin-token');
-            resolve(adminUser);
-            return;
-          }
+  clearSession() {
+    localStorage.removeItem(this.USER_KEY);
+    localStorage.removeItem(this.TOKEN_KEY);
+    localStorage.removeItem('lastActivity');
+  }
 
-          // Check other mock users
-          const user = MOCK_USERS.find((u) => u.email === email);
-          if (user && password === 'password123') {
-            this.saveSession(user, 'mock-token-' + user.id);
-            resolve(user);
-          } else {
-            reject(new Error('Invalid email or password'));
-          }
-        }, 800);
-      });
+  // ---------- HYBRID: Attempt backend call, fallback to mock if it fails ----------
+  async _tryBackend(path, payload) {
+    if (this.FORCE_MOCK) {
+      throw new Error('FORCE_MOCK enabled');
     }
-
-    // Real API call (when backend is ready)
-    const response = await fetch(`${this.API_BASE}/login`, {
+    const url = `${this.API_BASE}${path}`;
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(payload),
     });
-
-    if (!response.ok) {
-      throw new Error('Login failed');
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(text || 'Backend error');
     }
+    const data = await res.json();
+    return data;
+  }
 
-    const data = await response.json();
-    this.saveSession(data.user, data.token);
-    return data.user;
+  // login: accepts email or username
+  async login(identifier, password) {
+    // first try backend
+    try {
+      const payload = identifier.includes('@') ? { email: identifier, password } : { username: identifier, password };
+      const data = await this._tryBackend('/login', payload);
+      // backend expected to return { user, token } or {user, token}
+      const user = data.user || data;
+      const token = data.token || (data.user && data.user.token) || null;
+      this.saveSession(user, token);
+      return user;
+    } catch (err) {
+      // fallback to mock
+      return this._mockLogin(identifier, password);
+    }
+  }
+
+  // signup/register
+  async signup(data) {
+    try {
+      const backendData = await this._tryBackend('/register', data);
+      const user = backendData.user || backendData;
+      const token = backendData.token || null;
+      this.saveSession(user, token);
+      return user;
+    } catch (err) {
+      return this._mockSignup(data);
+    }
   }
 
   async loginWithGoogle() {
-    if (this.MOCK_MODE) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          const user = {
-            id: 'google-' + Date.now(),
-            email: 'user@gmail.com',
-            name: 'Google User',
-            role: 'CUSTOMER',
-            carbonPoints: 100,
-            createdAt: new Date().toISOString(),
-          };
-          this.saveSession(user, 'mock-google-token');
-          resolve(user);
-        }, 1000);
-      });
+    // attempt backend oauth endpoint then fallback
+    try {
+      const data = await this._tryBackend('/oauth/google', {});
+      const user = data.user || data;
+      const token = data.token || null;
+      this.saveSession(user, token);
+      return user;
+    } catch {
+      // mock
+      return this._mockSocial('Google');
     }
-
-    // Real implementation would use Google OAuth
-    const response = await fetch(`${this.API_BASE}/oauth/google`, {
-      method: 'POST',
-    });
-    const data = await response.json();
-    this.saveSession(data.user, data.token);
-    return data.user;
   }
 
   async loginWithFacebook() {
-    if (this.MOCK_MODE) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          const user = {
-            id: 'fb-' + Date.now(),
-            email: 'user@facebook.com',
-            name: 'Facebook User',
-            role: 'CUSTOMER',
-            carbonPoints: 100,
-            createdAt: new Date().toISOString(),
-          };
-          this.saveSession(user, 'mock-fb-token');
-          resolve(user);
-        }, 1000);
-      });
+    try {
+      const data = await this._tryBackend('/oauth/facebook', {});
+      const user = data.user || data;
+      const token = data.token || null;
+      this.saveSession(user, token);
+      return user;
+    } catch {
+      return this._mockSocial('Facebook');
     }
-
-    const response = await fetch(`${this.API_BASE}/oauth/facebook`, {
-      method: 'POST',
-    });
-    const data = await response.json();
-    this.saveSession(data.user, data.token);
-    return data.user;
-  }
-
-  async loginWithOTP(phone, otp) {
-    if (this.MOCK_MODE) {
-      return new Promise((resolve, reject) => {
-        setTimeout(() => {
-          if (otp === '123456') {
-            const user = {
-              id: 'otp-' + Date.now(),
-              email: `${phone}@ecobazaarx.com`,
-              name: 'OTP User',
-              role: 'CUSTOMER',
-              phone,
-              carbonPoints: 50,
-              createdAt: new Date().toISOString(),
-            };
-            this.saveSession(user, 'mock-otp-token');
-            resolve(user);
-          } else {
-            reject(new Error('Invalid OTP'));
-          }
-        }, 800);
-      });
-    }
-
-    const response = await fetch(`${this.API_BASE}/login/otp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, otp }),
-    });
-
-    if (!response.ok) {
-      throw new Error('OTP verification failed');
-    }
-
-    const data = await response.json();
-    this.saveSession(data.user, data.token);
-    return data.user;
-  }
-
-  async signup(data) {
-    if (this.MOCK_MODE) {
-      return new Promise((resolve, reject) => {
-        setTimeout(() => {
-          // Check if email already exists
-          if (MOCK_USERS.some((u) => u.email === data.email)) {
-            reject(new Error('Email already registered'));
-            return;
-          }
-
-          const user = {
-            id: 'user-' + Date.now(),
-            email: data.email,
-            name: data.name,
-            role: data.role,
-            phone: data.phone,
-            sellerStatus: data.role === 'SELLER' ? 'PENDING' : undefined,
-            carbonPoints: 100,
-            createdAt: new Date().toISOString(),
-          };
-
-          MOCK_USERS.push(user);
-          this.saveSession(user, 'mock-token-' + user.id);
-          resolve(user);
-        }, 1000);
-      });
-    }
-
-    const response = await fetch(`${this.API_BASE}/signup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Signup failed');
-    }
-
-    const result = await response.json();
-    this.saveSession(result.user, result.token);
-    return result.user;
   }
 
   async sendOTP(phone) {
-    if (this.MOCK_MODE) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          console.log('Mock OTP sent to:', phone, '- Use: 123456');
-          resolve();
-        }, 500);
-      });
-    }
-
-    const response = await fetch(`${this.API_BASE}/send-otp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to send OTP');
+    try {
+      await this._tryBackend('/send-otp', { phone });
+      return;
+    } catch {
+      // mock: console log
+      console.log('Mock OTP sent to', phone, '— use 123456');
+      return;
     }
   }
 
-  logout() {
-    localStorage.removeItem(this.USER_KEY);
-    localStorage.removeItem(this.TOKEN_KEY);
-    // Clear other user-specific data
-    localStorage.removeItem('ecobazaarx_cart');
-    localStorage.removeItem('userSettings');
-    localStorage.removeItem('currentUser');
+  async loginWithOTP(phone, otp) {
+    try {
+      const data = await this._tryBackend('/login/otp', { phone, otp });
+      const user = data.user || data;
+      const token = data.token || null;
+      this.saveSession(user, token);
+      return user;
+    } catch {
+      // mock
+      if (otp === '123456') {
+        const user = {
+          id: 'otp-' + Date.now(),
+          username: 'otp_user_' + Date.now().toString().slice(-4),
+          email: `${phone.replace(/\D/g, '')}@ecobazaarx.com`,
+          firstName: 'OTP',
+          lastName: 'User',
+          phone,
+          role: 'USER',
+          createdAt: nowISO(),
+        };
+        this._mockUsers.push(user);
+        this.saveSession(user, 'mock-otp-token');
+        return user;
+      } else {
+        throw new Error('Invalid OTP (mock). Use 123456');
+      }
+    }
+  }
+
+  async logout() {
+    this.clearSession();
+  }
+
+  // ----------------- MOCK IMPLEMENTATIONS -----------------
+  _findMockByIdentifier(identifier) {
+    return this._mockUsers.find(u => (u.email && u.email === identifier) || (u.username && u.username === identifier));
+  }
+
+  _mockLogin(identifier, password) {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        // admin credentials
+        if (identifier === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+          const admin = this._mockUsers.find(u => u.role === 'ADMIN');
+          this.saveSession(admin, 'mock-admin-token');
+          resolve(admin);
+          return;
+        }
+
+        const user = this._findMockByIdentifier(identifier);
+        if (user && (password === 'password123' || password === ADMIN_CREDENTIALS.password)) {
+          this.saveSession(user, 'mock-token-' + user.id);
+          resolve(user);
+        } else {
+          reject(new Error('Invalid credentials (mock). Use password123 for mock users.'));
+        }
+      }, 500);
+    });
+  }
+
+  _mockSignup(data) {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        // basic validation
+        if (!data.username || !data.password || !data.email || !data.firstName || !data.lastName) {
+          reject(new Error('Missing required fields (mock).'));
+          return;
+        }
+        if (this._mockUsers.some(u => u.email === data.email)) {
+          reject(new Error('Email already registered (mock).'));
+          return;
+        }
+        if (this._mockUsers.some(u => u.username === data.username)) {
+          reject(new Error('Username already taken (mock).'));
+          return;
+        }
+        const id = 'user-' + Date.now();
+        const newUser = {
+          id,
+          username: data.username,
+          email: data.email,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phone: data.phone,
+          role: data.role || 'USER',
+          sellerStatus: data.role === 'SELLER' ? 'PENDING' : undefined,
+          createdAt: nowISO(),
+        };
+        this._mockUsers.push(newUser);
+        this.saveSession(newUser, 'mock-token-' + id);
+        resolve(newUser);
+      }, 700);
+    });
+  }
+
+  _mockSocial(provider) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const user = {
+          id: provider.toLowerCase() + '-' + Date.now(),
+          username: `${provider.toLowerCase()}_user_${Date.now().toString().slice(-4)}`,
+          email: `${provider.toLowerCase()}_${Date.now().toString().slice(-4)}@example.com`,
+          firstName: provider,
+          lastName: 'User',
+          role: 'USER',
+          createdAt: nowISO(),
+        };
+        this._mockUsers.push(user);
+        this.saveSession(user, `mock-${provider.toLowerCase()}-token`);
+        resolve(user);
+      }, 600);
+    });
   }
 }
 
 export const authService = new AuthService();
+export default authService;

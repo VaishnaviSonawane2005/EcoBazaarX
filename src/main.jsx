@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App"; // ✅ Correct extension (.jsx)
+import App from "./App.jsx"; // ✅ Correct extension (.jsx)
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
