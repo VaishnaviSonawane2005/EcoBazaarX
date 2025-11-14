@@ -1,3 +1,4 @@
+// src/components/DashboardLayout.jsx
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -43,10 +44,11 @@ export default function DashboardLayout({ children, title, role, menuItems }) {
   };
 
   const isActivePath = (path) => {
-    if (path === `/${role.toLowerCase()}`) {
-      return location.pathname === path;
-    }
-    return location.pathname.startsWith(path);
+    if (!path) return false;
+    const normalized = path.replace(/\/+$/, '');
+    const current = location.pathname.replace(/\/+$/, '');
+    if (normalized === `/${role?.toLowerCase()}`) return current === normalized;
+    return current.startsWith(normalized);
   };
 
   return (
@@ -66,7 +68,7 @@ export default function DashboardLayout({ children, title, role, menuItems }) {
               </Button>
               <Link to="/" className="flex items-center gap-2 text-emerald-600">
                 <Leaf className="w-6 h-6" />
-                <span className="hidden sm:inline">EcoBazaarX</span>
+                <span className="hidden sm:inline font-semibold">EcoBazaarX</span>
               </Link>
               {role === 'CUSTOMER' && user?.carbonPoints !== undefined && (
                 <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
@@ -109,14 +111,14 @@ export default function DashboardLayout({ children, title, role, menuItems }) {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" aria-label="Profile menu">
                     <User className="w-5 h-5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>
                     <div className="flex flex-col">
-                      <span>{user?.name}</span>
+                      <span className="font-medium">{user?.name || user?.username || 'Guest'}</span>
                       <span className="text-xs text-gray-500">{user?.email}</span>
                     </div>
                   </DropdownMenuLabel>
@@ -149,26 +151,21 @@ export default function DashboardLayout({ children, title, role, menuItems }) {
             ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           `}
         >
-          <nav className="p-4 space-y-1">
-            {menuItems.map((item) => (
+          <nav className="p-4 space-y-1 overflow-y-auto h-full">
+            {menuItems?.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
                 className={`
                   flex items-center gap-3 px-4 py-3 rounded-lg transition-colors
-                  ${
-                    isActivePath(item.path)
-                      ? 'bg-emerald-50 text-emerald-600'
-                      : 'text-gray-700 hover:bg-gray-50'
-                  }
+                  ${isActivePath(item.path) ? 'bg-emerald-50 text-emerald-600' : 'text-gray-700 hover:bg-gray-50'}
                 `}
               >
                 <item.icon className="w-5 h-5" />
-                <span>{item.label}</span>
+                <span className="truncate">{item.label}</span>
               </Link>
             ))}
-            {/* Logout Button in Sidebar */}
             <button
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-red-600 hover:bg-red-50 mt-4"
@@ -180,9 +177,10 @@ export default function DashboardLayout({ children, title, role, menuItems }) {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-6 lg:p-8">
+        {/* Important: add lg:ml-64 so main content is not covered by fixed sidebar */}
+        <main className="flex-1 p-6 lg:p-8 lg:ml-64">
           <div className="max-w-7xl mx-auto">
-            <h1 className="mb-6">{title}</h1>
+            {title && <h1 className="mb-6 text-2xl font-semibold">{title}</h1>}
             {children}
           </div>
         </main>
@@ -193,16 +191,12 @@ export default function DashboardLayout({ children, title, role, menuItems }) {
         <div
           className="fixed inset-0 bg-black/50 z-10 lg:hidden"
           onClick={() => setSidebarOpen(false)}
-        ></div>
+        />
       )}
 
-      {/* Profile Settings Dialog */}
+      {/* Dialogs / Panels */}
       <ProfileSettings open={settingsOpen} onOpenChange={setSettingsOpen} />
-
-      {/* Edit Profile Dialog */}
       <EditProfile open={editProfileOpen} onOpenChange={setEditProfileOpen} />
-
-      {/* Notifications Panel */}
       <NotificationsPanel open={notificationsOpen} onOpenChange={setNotificationsOpen} />
     </div>
   );

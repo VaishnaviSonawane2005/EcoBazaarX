@@ -1,97 +1,114 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { toast } from 'sonner';
-import { Upload, Leaf } from 'lucide-react';
+// src/components/seller/AddProduct.jsx
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+import { Card, CardHeader, CardContent, CardTitle } from "../ui/card";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Textarea } from "../ui/textarea";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from "../ui/select";
+
+import { Upload, Leaf, Star } from "lucide-react";
+import { toast } from "sonner";
 
 export default function AddProduct() {
   const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
-    name: '',
-    category: '',
-    price: '',
-    stock: '',
-    description: '',
-    carbonFootprint: '',
-    sustainabilityScore: '',
+    name: "",
+    category: "",
+    price: "",
+    stock: "",
+    description: "",
+    carbonFootprint: "",
+    ecoRating: "",
+    image: "",
   });
 
   const categories = [
-    'Organic Food',
-    'Sustainable Fashion',
-    'Eco-Friendly Products',
-    'Home & Garden',
-    'Electronics',
-    'Beauty & Personal Care',
+    "Clothing",
+    "Home",
+    "Electronics",
+    "Beauty",
+    "Personal Care",
+    "Accessories",
+    "Kitchen",
   ];
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    // Validation
+
+    // Basic validation
     if (!formData.name || !formData.category || !formData.price || !formData.stock) {
-      toast.error('Please fill in all required fields');
+      toast.error("Please fill all required fields.");
       return;
     }
 
-    // Mock product creation
-    toast.success('Product added successfully!');
-    navigate('/seller/products');
+    toast.success("Product added successfully! (Mock Mode)");
+    navigate("/seller/products");
   };
 
   return (
     <div className="max-w-3xl space-y-6">
       <div>
         <h2>Add New Product</h2>
-        <p className="text-gray-600 mt-2">List a new eco-friendly product</p>
+        <p className="text-gray-600 mt-1">
+          List a new eco-friendly product on EcoBazaarX.
+        </p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Product Information</CardTitle>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+
+            {/* Product Name */}
             <div className="space-y-2">
-              <Label htmlFor="name">Product Name *</Label>
+              <Label>Product Name *</Label>
               <Input
-                id="name"
-                placeholder="e.g., Organic Cotton T-Shirt"
+                placeholder="Organic Cotton T-Shirt"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
               />
             </div>
 
+            {/* Category */}
             <div className="space-y-2">
-              <Label htmlFor="category">Category *</Label>
+              <Label>Category *</Label>
+
               <Select
                 value={formData.category}
                 onValueChange={(value) => setFormData({ ...formData, category: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
+                  <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
+                  {categories.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
+            {/* Price & Stock */}
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="price">Price (USD) *</Label>
+                <Label>Price (USD) *</Label>
                 <Input
-                  id="price"
                   type="number"
                   step="0.01"
                   placeholder="29.99"
@@ -102,9 +119,8 @@ export default function AddProduct() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="stock">Stock Quantity *</Label>
+                <Label>Stock Quantity *</Label>
                 <Input
-                  id="stock"
                   type="number"
                   placeholder="100"
                   value={formData.stock}
@@ -114,71 +130,94 @@ export default function AddProduct() {
               </div>
             </div>
 
+            {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label>Description</Label>
               <Textarea
-                id="description"
-                placeholder="Describe your eco-friendly product..."
                 rows={4}
+                placeholder="Describe your eco-friendly product"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
               />
             </div>
 
+            {/* Carbon & Rating */}
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="carbonFootprint" className="flex items-center gap-2">
+                <Label className="flex items-center gap-2">
                   <Leaf className="w-4 h-4 text-emerald-600" />
                   Carbon Footprint (kg CO₂)
                 </Label>
                 <Input
-                  id="carbonFootprint"
                   type="number"
-                  step="0.01"
+                  step="0.1"
                   placeholder="2.5"
                   value={formData.carbonFootprint}
-                  onChange={(e) => setFormData({ ...formData, carbonFootprint: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, carbonFootprint: e.target.value })
+                  }
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="sustainabilityScore">Sustainability Score (0-100)</Label>
+                <Label className="flex items-center gap-2">
+                  <Star className="w-4 h-4 text-yellow-500" />
+                  Eco Rating (1–5)
+                </Label>
                 <Input
-                  id="sustainabilityScore"
                   type="number"
-                  min="0"
-                  max="100"
-                  placeholder="85"
-                  value={formData.sustainabilityScore}
-                  onChange={(e) => setFormData({ ...formData, sustainabilityScore: e.target.value })}
+                  min="1"
+                  max="5"
+                  placeholder="5"
+                  value={formData.ecoRating}
+                  onChange={(e) =>
+                    setFormData({ ...formData, ecoRating: e.target.value })
+                  }
                 />
               </div>
             </div>
 
+            {/* Image Upload URL */}
             <div className="space-y-2">
-              <Label>Product Images</Label>
-              <div className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-gray-50 cursor-pointer">
-                <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-                <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 10MB</p>
+              <Label>Product Image URL</Label>
+              <Input
+                placeholder="https://example.com/image.jpg"
+                value={formData.image}
+                onChange={(e) =>
+                  setFormData({ ...formData, image: e.target.value })
+                }
+              />
+            </div>
+
+            {/* Upload Box (mock only) */}
+            <div className="space-y-2">
+              <Label>Upload Image (mock)</Label>
+
+              <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                <Upload className="w-8 h-8 mx-auto text-gray-400" />
+                <p className="text-sm text-gray-600 mt-1">
+                  Drag & drop or click to upload (not functional in mock mode)
+                </p>
               </div>
             </div>
 
+            {/* Buttons */}
             <div className="flex gap-3">
-              <Button
-                type="submit"
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-              >
+              <Button type="submit" className="flex-1 bg-emerald-600">
                 Add Product
               </Button>
+
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate('/seller/products')}
+                onClick={() => navigate("/seller/products")}
               >
                 Cancel
               </Button>
             </div>
+
           </form>
         </CardContent>
       </Card>

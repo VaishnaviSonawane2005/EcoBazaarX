@@ -1,23 +1,60 @@
 // src/services/adminService.js
-// MOCK MODE ADMIN SERVICE
+// MOCK MODE ADMIN SERVICE (added approveSeller, createProduct passthrough for admin flows)
 
 class AdminService {
   constructor() {
     this.MOCK_MODE = true;
+    // store of users (same shape as earlier)
+    this._users = this.getMockUsers();
   }
 
   async getAllUsers() {
-    return new Promise((resolve) =>
-      setTimeout(() => resolve(this.getMockUsers()), 300)
-    );
+    if (this.MOCK_MODE) {
+      return new Promise((resolve) =>
+        setTimeout(() => resolve([...this._users]), 250)
+      );
+    }
+    const res = await fetch("/api/admin/users");
+    return res.json();
   }
 
   async deleteUser(id) {
-    return new Promise((resolve) => setTimeout(resolve, 200));
+    if (this.MOCK_MODE) {
+      return new Promise((resolve) =>
+        setTimeout(() => {
+          this._users = this._users.filter((u) => u.id !== id);
+          resolve();
+        }, 200)
+      );
+    }
+    await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
+  }
+
+  async approveSeller(userId, approve = true) {
+    if (this.MOCK_MODE) {
+      return new Promise((resolve, reject) =>
+        setTimeout(() => {
+          const idx = this._users.findIndex((u) => u.id === userId);
+          if (idx === -1) return reject(new Error("User not found"));
+          this._users[idx].sellerStatus = approve ? "APPROVED" : "REJECTED";
+          resolve(this._users[idx]);
+        }, 300)
+      );
+    }
+
+    const res = await fetch(`/api/admin/users/${userId}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ approve }),
+      headers: { "Content-Type": "application/json" },
+    });
+    return res.json();
   }
 
   async deleteProduct(id) {
-    return new Promise((resolve) => setTimeout(resolve, 200));
+    if (this.MOCK_MODE) {
+      return new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
   }
 
   getMockUsers() {
