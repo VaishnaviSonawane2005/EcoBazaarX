@@ -11,6 +11,7 @@ import CarbonInsights from '../components/customer/CarbonInsights';
 import Recommendations from '../components/customer/Recommendations';
 import CarbonPoints from '../components/customer/CarbonPoints';
 import Orders from '../components/customer/Orders';
+import OrderDetails from "../components/customer/OrderDetails";   // ⭐ NEW
 
 import {
   ShoppingBag,
@@ -44,6 +45,7 @@ export default function CustomerDashboard() {
         <Route path="/products" element={<ProductCatalog />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/orders" element={<Orders />} />
+        <Route path="orders/:orderId" element={<OrderDetails />} /> {/* ⭐ NEW */}
         <Route path="/insights" element={<CarbonInsights />} />
         <Route path="/recommendations" element={<Recommendations />} />
         <Route path="/points" element={<CarbonPoints />} />
