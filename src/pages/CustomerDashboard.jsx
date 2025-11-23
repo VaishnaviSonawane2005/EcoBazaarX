@@ -45,7 +45,7 @@ export default function CustomerDashboard() {
         <Route path="/products" element={<ProductCatalog />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/orders" element={<Orders />} />
-        <Route path="orders/:orderId" element={<OrderDetails />} /> {/* ⭐ NEW */}
+        <Route path="/orders/:orderId" element={<OrderDetails />} /> 
         <Route path="/insights" element={<CarbonInsights />} />
         <Route path="/recommendations" element={<Recommendations />} />
         <Route path="/points" element={<CarbonPoints />} />

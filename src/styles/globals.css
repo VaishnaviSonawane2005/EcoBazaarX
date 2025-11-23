@@ -187,3 +187,8 @@
 html {
   font-size: var(--font-size);
 }
+
+#ecobot-container {
+  position: fixed !important;
+  z-index: 999999 !important;
+}
