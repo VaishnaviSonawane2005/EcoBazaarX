@@ -181,6 +181,7 @@
       font-weight: var(--font-weight-normal);
       line-height: 1.5;
     }
+    
   }
 }
 
@@ -188,7 +189,5 @@ html {
   font-size: var(--font-size);
 }
 
-#ecobot-container {
-  position: fixed !important;
-  z-index: 999999 !important;
-}
+
+
